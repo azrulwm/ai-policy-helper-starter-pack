@@ -1,6 +1,6 @@
 'use client';
-import React from 'react';
 import { apiIngest, apiMetrics } from '@/lib/api';
+import React from 'react';
 
 export default function AdminPanel() {
   const [metrics, setMetrics] = React.useState<any>(null);
@@ -21,19 +21,40 @@ export default function AdminPanel() {
     }
   };
 
-  React.useEffect(() => { refresh(); }, []);
+  React.useEffect(() => {
+    refresh();
+  }, []);
 
   return (
-    <div className="card">
+    <div className='card'>
       <h2>Admin</h2>
-      <div style={{display:'flex', gap:8, marginBottom:8}}>
-        <button onClick={ingest} disabled={busy} style={{padding:'8px 12px', borderRadius:8, border:'1px solid #111', background:'#fff'}}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+        <button
+          onClick={ingest}
+          disabled={busy}
+          style={{
+            padding: '8px 12px',
+            borderRadius: 8,
+            border: '1px solid #111',
+            background: '#fff',
+          }}
+        >
           {busy ? 'Indexing...' : 'Ingest sample docs'}
         </button>
-        <button onClick={refresh} style={{padding:'8px 12px', borderRadius:8, border:'1px solid #111', background:'#fff'}}>Refresh metrics</button>
+        <button
+          onClick={refresh}
+          style={{
+            padding: '8px 12px',
+            borderRadius: 8,
+            border: '1px solid #111',
+            background: '#fff',
+          }}
+        >
+          Refresh metrics
+        </button>
       </div>
       {metrics && (
-        <div className="code">
+        <div className='code'>
           <pre>{JSON.stringify(metrics, null, 2)}</pre>
         </div>
       )}
