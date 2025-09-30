@@ -8,9 +8,22 @@ A local-first RAG starter with **FastAPI** (backend), **Next.js** (frontend), an
 1) **Copy `.env.example` → `.env`** and edit as needed.
 
 2) **Run everything**:
+
+**Production mode** (for deployment/testing):
 ```bash
-docker compose up --build
+docker compose up -d
 ```
+
+**Development mode** (with hot reload for coding):
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+```
+
+**Stop everything**:
+```bash
+docker compose down
+```
+
 - Frontend: http://localhost:3000  
 - Backend:  http://localhost:8000/docs  
 - Qdrant:   http://localhost:6333 (UI)

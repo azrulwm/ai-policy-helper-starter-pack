@@ -1,0 +1,10 @@
+services:
+  backend:
+    volumes:
+      - ./backend/app:/app/app  # Hot reload for backend code
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload  # Enable hot reload
+
+  frontend:
+    volumes:
+      - ./frontend:/app         # Hot reload for frontend code
+    command: npm run dev        # Enable Next.js development mode with hot reload
