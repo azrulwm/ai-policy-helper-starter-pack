@@ -18,6 +18,7 @@ export default function Chat() {
     if (!q.trim()) return;
     const my = { role: 'user' as const, content: q };
     setMessages((m) => [...m, my]);
+    setQ('');
     setLoading(true);
     try {
       const res = await apiAsk(q);
@@ -35,7 +36,6 @@ export default function Chat() {
       ]);
     } finally {
       setLoading(false);
-      setQ('');
     }
   };
 
@@ -96,7 +96,7 @@ export default function Chat() {
             border: '1px solid #ddd',
           }}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') send();
+            if (e.key === 'Enter' && !loading) send();
           }}
         />
         <button

@@ -42,6 +42,14 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 docker compose down
 ```
 
+**Important: Changing environment variables**:
+When modifying `.env` file (e.g., switching LLM providers), Docker Compose caches the old values. Always use:
+```bash
+docker compose down
+docker compose --profile ollama up --build -d  # (or without --profile for other providers)
+```
+**Never use** `docker compose restart` as it doesn't reload environment variables.
+
 - Frontend: http://localhost:3000  
 - Backend:  http://localhost:8000/docs  
 - Qdrant:   http://localhost:6333 (UI)

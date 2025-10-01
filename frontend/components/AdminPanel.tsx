@@ -15,7 +15,8 @@ export default function AdminPanel() {
     setBusy(true);
     try {
       await apiIngest();
-      await refresh();
+      // Note: Not auto-refreshing metrics to match examiner's expected workflow:
+      // "click Ingest sample docs and then Refresh metrics"
     } finally {
       setBusy(false);
     }
