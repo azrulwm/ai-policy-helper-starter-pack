@@ -2,10 +2,27 @@ import time
 
 
 def test_health(client):
-    """Test health endpoint works and returns expected format"""
+    """Test health endpoint works and returns enhanced configuration status"""
     r = client.get("/api/health")
     assert r.status_code == 200
-    assert r.json()["status"] == "ok"
+    data = r.json()
+    
+    # Basic health check
+    assert data["status"] == "ok"
+    
+    # Enhanced configuration validation fields
+    assert "config_valid" in data
+    assert isinstance(data["config_valid"], bool)
+    assert "config_issues" in data
+    assert isinstance(data["config_issues"], list)
+    assert "config_warnings" in data
+    assert isinstance(data["config_warnings"], list)
+    
+    # LLM and vector store information
+    assert "llm_provider" in data
+    assert data["llm_provider"] in ["stub", "openai", "ollama"]
+    assert "vector_store" in data
+    assert data["vector_store"] in ["qdrant", "memory"]
 
 
 def test_metrics_endpoint(client):
@@ -14,11 +31,18 @@ def test_metrics_endpoint(client):
     assert response.status_code == 200
     data = response.json()
     
-    # Check all required fields exist and are numbers
-    required_fields = ["total_docs", "total_chunks", "avg_retrieval_latency_ms", "avg_generation_latency_ms"]
-    for field in required_fields:
+    # Check all required numeric fields exist and are numbers
+    required_numeric_fields = ["total_docs", "total_chunks", "avg_retrieval_latency_ms", "avg_generation_latency_ms"]
+    for field in required_numeric_fields:
         assert field in data
         assert isinstance(data[field], (int, float))
+    
+    # Check new enhanced fields we added
+    assert "embedding_model" in data
+    assert "llm_model" in data
+    assert "llm_healthy" in data
+    assert isinstance(data["llm_healthy"], bool)
+    assert "vector_store" in data
 
 
 def test_full_workflow(client):
@@ -81,6 +105,28 @@ def test_ask_without_data(client):
     assert "answer" in data
     assert "citations" in data
     assert isinstance(data["citations"], list)
+
+
+def test_llm_error_handling_graceful(client):
+    """Test that LLM errors are handled gracefully without crashing the service"""
+    client.post("/api/ingest")
+    
+    # Even if LLM fails (like our OpenAI quota issue), the API should still work
+    response = client.post("/api/ask", json={"query": "What is the warranty policy?"})
+    assert response.status_code == 200
+    data = response.json()
+    
+    # Response should have proper structure
+    assert "answer" in data
+    assert "citations" in data
+    assert "chunks" in data
+    
+    # Answer might be an error message, but it should be a string
+    assert isinstance(data["answer"], str)
+    
+    # Citations and chunks should still work (retrieval continues working)
+    assert isinstance(data["citations"], list)
+    assert isinstance(data["chunks"], list)
 
 
 def test_metrics_update_after_operations(client):

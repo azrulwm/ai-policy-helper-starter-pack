@@ -32,3 +32,5 @@ class MetricsResponse(BaseModel):
     avg_generation_latency_ms: float
     embedding_model: str
     llm_model: str
+    llm_healthy: bool
+    vector_store: str
