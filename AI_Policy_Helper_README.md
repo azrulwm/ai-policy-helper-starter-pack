@@ -104,11 +104,25 @@ ai-policy-helper/
 └─ .env.example
 ```
 
-## Tests
-Run unit tests inside the backend container:
+## Testing
+
+### Running Tests
 ```bash
-docker compose run --rm backend pytest -q
+# 1. Build and start all services (--build ensures latest test files)
+docker compose up --build -d
+
+# 2. Run comprehensive test suite
+docker compose exec backend bash -c "cd /app && PYTHONPATH=/app pytest -v"
 ```
+
+### Test Coverage
+- **Health & Metrics**: API endpoint validation
+- **Full Workflow**: Document ingestion → question answering  
+- **Acceptance Criteria**: Required blender and shipping questions
+- **Error Handling**: Invalid requests, edge cases
+- **Performance**: Response time benchmarks
+
+**Note**: Tests take ~4 minutes due to Ollama LLM being slow (~20s/query). With OpenAI, they run much faster.
 
 ## Notes
 - Keep it simple. For take-home, focus on correctness, citations, and clean code.
