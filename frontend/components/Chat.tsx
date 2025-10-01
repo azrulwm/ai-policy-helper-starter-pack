@@ -1,5 +1,5 @@
 'use client';
-import { apiAsk } from '@/lib/api';
+import { apiAsk, apiMetrics } from '@/lib/api';
 import React from 'react';
 
 type Message = {
@@ -13,15 +13,32 @@ export default function Chat() {
   const [messages, setMessages] = React.useState<Message[]>([]);
   const [q, setQ] = React.useState('');
   const [loading, setLoading] = React.useState(false);
+  const [hasData, setHasData] = React.useState<boolean | null>(null); // null = checking, true/false = result
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const checkDataAvailability = async () => {
+    try {
+      const metrics = await apiMetrics();
+      setHasData(metrics.total_docs > 0);
+    } catch (error) {
+      setHasData(false);
+    }
+  };
+
   React.useEffect(() => {
     scrollToBottom();
   }, [messages, loading]);
+
+  React.useEffect(() => {
+    checkDataAvailability();
+    // Check periodically in case data gets ingested
+    const interval = setInterval(checkDataAvailability, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const send = async () => {
     if (!q.trim()) return;
@@ -57,22 +74,34 @@ export default function Chat() {
       <div className="chat-messages">
         {messages.length === 0 && (
           <div className="empty-state">
-            <p>👋 Hi! I'm your AI assistant. Ask me about policies, products, shipping, or returns.</p>
-            <div className="suggested-questions">
-              <p><strong>Try asking:</strong></p>
-              <button 
-                className="suggestion-btn"
-                onClick={() => setQ("Can a customer return a damaged blender after 20 days?")}
-              >
-                "Can a customer return a damaged blender after 20 days?"
-              </button>
-              <button 
-                className="suggestion-btn"
-                onClick={() => setQ("What's the shipping SLA to East Malaysia for bulky items?")}
-              >
-                "What's the shipping SLA to East Malaysia for bulky items?"
-              </button>
-            </div>
+            {hasData === null ? (
+              <p>� Checking system status...</p>
+            ) : hasData === false ? (
+              <div>
+                <p>⚠️ No documents have been ingested yet.</p>
+                <p><strong>Please use the Admin panel to "Ingest sample docs" first.</strong></p>
+                <p>Once documents are loaded, you'll be able to ask questions about policies, products, shipping, and returns.</p>
+              </div>
+            ) : (
+              <div>
+                <p>�👋 Hi! I'm your AI assistant. Ask me about policies, products, shipping, or returns.</p>
+                <div className="suggested-questions">
+                  <p><strong>Try asking:</strong></p>
+                  <button 
+                    className="suggestion-btn"
+                    onClick={() => setQ("Can a customer return a damaged blender after 20 days?")}
+                  >
+                    "Can a customer return a damaged blender after 20 days?"
+                  </button>
+                  <button 
+                    className="suggestion-btn"
+                    onClick={() => setQ("What's the shipping SLA to East Malaysia for bulky items?")}
+                  >
+                    "What's the shipping SLA to East Malaysia for bulky items?"
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
         
@@ -140,20 +169,22 @@ export default function Chat() {
       <div className="chat-input">
         <input
           type="text"
-          placeholder='Ask about policies, products, shipping, returns...'
+          placeholder={hasData === false ? 'Please ingest documents first...' : 'Ask about policies, products, shipping, returns...'}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           className="chat-input-field"
+          disabled={hasData === false}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !loading && q.trim()) send();
+            if (e.key === 'Enter' && !loading && q.trim() && hasData) send();
           }}
         />
         <button
           onClick={send}
-          disabled={loading || !q.trim()}
+          disabled={loading || !q.trim() || hasData === false}
           className="btn-primary chat-send-btn"
+          title={hasData === false ? 'Please ingest documents first' : undefined}
         >
-          {loading ? '⏳' : '📤'}
+          {loading ? '⏳' : hasData === false ? '🚫' : '📤'}
         </button>
       </div>
     </div>
