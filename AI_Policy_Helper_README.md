@@ -1,6 +1,24 @@
 # AI Policy & Product Helper
 
-A local-first RAG starter with **FastAPI** (backend), **Next.js** (frontend), and **Qdrant** (vector DB). Runs with one command using Docker Compose.
+A local-fir## LLM Provider Options
+
+**OpenAI (Recommended for testing)**:
+```bash
+# Set LLM_PROVIDER=openai in .env
+docker compose up --build  # Fast startup, no model downloads
+```
+
+**Ollama (Local LLM)**:
+```bash  
+# Set LLM_PROVIDER=ollama in .env
+docker compose --profile ollama up --build  # Includes ~2GB model download
+```
+
+**Offline/Stub mode**:
+```bash
+# Set LLM_PROVIDER=stub in .env - fully local, deterministic responses
+docker compose up --build
+```RAG starter with **FastAPI** (backend), **Next.js** (frontend), and **Qdrant** (vector DB). Runs with one command using Docker Compose.
 
 
 ## Quick start

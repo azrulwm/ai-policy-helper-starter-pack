@@ -70,7 +70,15 @@ class QdrantStore:
     def upsert(self, vectors: List[np.ndarray], metadatas: List[Dict]):
         points = []
         for i, (v, m) in enumerate(zip(vectors, metadatas)):
-            points.append(qm.PointStruct(id=m.get("id") or m.get("hash") or i, vector=v.tolist(), payload=m))
+            # Convert hash string to integer for Qdrant compatibility
+            point_id = i
+            if m.get("hash"):
+                # Convert hex hash to integer (take first 8 bytes to avoid overflow)
+                point_id = int(m["hash"][:16], 16)
+            elif m.get("id"):
+                point_id = m["id"] if isinstance(m["id"], int) else i
+            
+            points.append(qm.PointStruct(id=point_id, vector=v.tolist(), payload=m))
         self.client.upsert(collection_name=self.collection, points=points)
 
     def search(self, query: np.ndarray, k: int = 4) -> List[Tuple[float, Dict]]:
@@ -115,6 +123,32 @@ class OpenAILLM:
         )
         return resp.choices[0].message.content
 
+class OllamaLLM:
+    def __init__(self, host: str = "http://localhost:11434"):
+        import httpx
+        self.host = host.rstrip('/')
+        self.client = httpx.Client(timeout=120.0)
+        
+    def generate(self, query: str, contexts: List[Dict]) -> str:
+        prompt = f"You are a helpful company policy assistant. Cite sources by title and section when relevant.\nQuestion: {query}\nSources:\n"
+        for c in contexts:
+            prompt += f"- {c.get('title')} | {c.get('section')}\n{c.get('text')[:600]}\n---\n"
+        prompt += "Write a concise, accurate answer grounded in the sources. If unsure, say so."
+        
+        payload = {
+            "model": "llama3.2:1b",  # Lightweight model
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "temperature": 0.1,
+                "num_predict": 500
+            }
+        }
+        
+        response = self.client.post(f"{self.host}/api/generate", json=payload)
+        response.raise_for_status()
+        return response.json().get("response", "Sorry, I couldn't generate a response.")
+
 # ---- RAG Orchestrator & Metrics ----
 class Metrics:
     def __init__(self):
@@ -155,6 +189,13 @@ class RAGEngine:
             except Exception:
                 self.llm = StubLLM()
                 self.llm_name = "stub"
+        elif settings.llm_provider == "ollama":
+            try:
+                self.llm = OllamaLLM(host=settings.ollama_host)
+                self.llm_name = "ollama:llama3.2:1b"
+            except Exception:
+                self.llm = StubLLM()
+                self.llm_name = "stub"
         else:
             self.llm = StubLLM()
             self.llm_name = "stub"
@@ -162,6 +203,41 @@ class RAGEngine:
         self.metrics = Metrics()
         self._doc_titles = set()
         self._chunk_count = 0
+        
+        # Sync with existing data on startup
+        self._sync_with_existing_data()
+
+    def _sync_with_existing_data(self):
+        """Sync internal counters with existing data in the vector store"""
+        try:
+            if isinstance(self.store, QdrantStore):
+                # Get collection info from Qdrant
+                collection_info = self.store.client.get_collection(self.store.collection)
+                self._chunk_count = collection_info.points_count
+                
+                # Get unique document titles from existing data
+                # Scroll through all points to get document titles
+                points = self.store.client.scroll(
+                    collection_name=self.store.collection,
+                    limit=1000,  # Adjust if you have more than 1000 chunks
+                    with_payload=True
+                )
+                
+                for point in points[0]:  # points[0] contains the actual points
+                    if point.payload and "title" in point.payload:
+                        self._doc_titles.add(point.payload["title"])
+                        
+            elif isinstance(self.store, InMemoryStore):
+                # For in-memory store, count existing data
+                self._chunk_count = len(self.store.vecs)
+                for meta in self.store.meta:
+                    if "title" in meta:
+                        self._doc_titles.add(meta["title"])
+                        
+        except Exception as e:
+            # If sync fails (e.g., collection doesn't exist), start with empty counters
+            self._doc_titles = set()
+            self._chunk_count = 0
 
     def ingest_chunks(self, chunks: List[Dict]) -> Tuple[int, int]:
         vectors = []
