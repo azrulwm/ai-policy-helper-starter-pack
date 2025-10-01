@@ -123,12 +123,12 @@ graph TB
     
     subgraph "Storage"
         F[Qdrant Vector DB]
-        G[Data Directory<br/>(/data/*.md)]
+        G["Data Directory (/data/*.md)"]
     end
     
     subgraph "External Services"
-        H[OpenAI API<br/>(Optional)]
-        I[Ollama<br/>(Optional)]
+        H["OpenAI API (Optional)"]
+        I["Ollama (Optional)"]
     end
     
     A --> E
