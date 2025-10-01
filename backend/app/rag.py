@@ -112,16 +112,25 @@ class OpenAILLM:
         self.client = OpenAI(api_key=api_key)
 
     def generate(self, query: str, contexts: List[Dict]) -> str:
-        prompt = f"You are a helpful company policy assistant. Cite sources by title and section when relevant.\nQuestion: {query}\nSources:\n"
-        for c in contexts:
-            prompt += f"- {c.get('title')} | {c.get('section')}\n{c.get('text')[:600]}\n---\n"
-        prompt += "Write a concise, accurate answer grounded in the sources. If unsure, say so."
-        resp = self.client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role":"user","content":prompt}],
-            temperature=0.1
-        )
-        return resp.choices[0].message.content
+        try:
+            prompt = f"You are a helpful company policy assistant. Cite sources by title and section when relevant.\nQuestion: {query}\nSources:\n"
+            for c in contexts:
+                prompt += f"- {c.get('title')} | {c.get('section')}\n{c.get('text')[:600]}\n---\n"
+            prompt += "Write a concise, accurate answer grounded in the sources. If unsure, say so."
+            resp = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role":"user","content":prompt}],
+                temperature=0.1
+            )
+            return resp.choices[0].message.content
+        except Exception as e:
+            error_msg = str(e)
+            if "401" in error_msg or "authentication" in error_msg.lower():
+                return "❌ OpenAI API authentication failed. Please check your API key in the .env file."
+            elif "quota" in error_msg.lower() or "limit" in error_msg.lower():
+                return "❌ OpenAI API quota exceeded. Please check your usage limits."
+            else:
+                return f"❌ OpenAI API error: {error_msg[:100]}..."
 
 class OllamaLLM:
     def __init__(self, host: str = "http://localhost:11434"):
@@ -130,24 +139,35 @@ class OllamaLLM:
         self.client = httpx.Client(timeout=120.0)
         
     def generate(self, query: str, contexts: List[Dict]) -> str:
-        prompt = f"You are a helpful company policy assistant. Cite sources by title and section when relevant.\nQuestion: {query}\nSources:\n"
-        for c in contexts:
-            prompt += f"- {c.get('title')} | {c.get('section')}\n{c.get('text')[:600]}\n---\n"
-        prompt += "Write a concise, accurate answer grounded in the sources. If unsure, say so."
-        
-        payload = {
-            "model": "llama3.2:1b",  # Lightweight model
-            "prompt": prompt,
-            "stream": False,
-            "options": {
-                "temperature": 0.1,
-                "num_predict": 500
+        try:
+            prompt = f"You are a helpful company policy assistant. Cite sources by title and section when relevant.\nQuestion: {query}\nSources:\n"
+            for c in contexts:
+                prompt += f"- {c.get('title')} | {c.get('section')}\n{c.get('text')[:600]}\n---\n"
+            prompt += "Write a concise, accurate answer grounded in the sources. If unsure, say so."
+            
+            payload = {
+                "model": "llama3.2:1b",  # Lightweight model
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "temperature": 0.1,
+                    "num_predict": 500
+                }
             }
-        }
-        
-        response = self.client.post(f"{self.host}/api/generate", json=payload)
-        response.raise_for_status()
-        return response.json().get("response", "Sorry, I couldn't generate a response.")
+            
+            response = self.client.post(f"{self.host}/api/generate", json=payload)
+            response.raise_for_status()
+            return response.json().get("response", "Sorry, I couldn't generate a response.")
+        except Exception as e:
+            error_msg = str(e)
+            if "connection" in error_msg.lower() or "refused" in error_msg.lower():
+                return "❌ Cannot connect to Ollama. Please ensure Ollama is running and accessible."
+            elif "timeout" in error_msg.lower():
+                return "❌ Ollama request timed out. The model may be loading or overloaded."
+            elif "404" in error_msg:
+                return "❌ Ollama model 'llama3.2:1b' not found. Please pull the model: `ollama pull llama3.2:1b`"
+            else:
+                return f"❌ Ollama error: {error_msg[:100]}..."
 
 # ---- RAG Orchestrator & Metrics ----
 class Metrics:
@@ -181,24 +201,39 @@ class RAGEngine:
         else:
             self.store = InMemoryStore(dim=384)
 
-        # LLM selection
+        # LLM selection with better error handling
+        self.llm_name = "stub"  # Default fallback
+        
         if settings.llm_provider == "openai" and settings.openai_api_key:
             try:
-                self.llm = OpenAILLM(api_key=settings.openai_api_key)
-                self.llm_name = "openai:gpt-4o-mini"
-            except Exception:
+                # Validate API key format
+                if not settings.openai_api_key.startswith(('sk-', 'sk-proj-')):
+                    print(f"⚠️  Invalid OpenAI API key format. Using stub LLM.")
+                    self.llm = StubLLM()
+                else:
+                    self.llm = OpenAILLM(api_key=settings.openai_api_key)
+                    self.llm_name = "openai:gpt-4o-mini"
+                    print(f"✅ Initialized OpenAI LLM")
+            except Exception as e:
+                print(f"⚠️  Failed to initialize OpenAI LLM: {e}. Using stub LLM.")
                 self.llm = StubLLM()
                 self.llm_name = "stub"
         elif settings.llm_provider == "ollama":
             try:
                 self.llm = OllamaLLM(host=settings.ollama_host)
                 self.llm_name = "ollama:llama3.2:1b"
-            except Exception:
+                print(f"✅ Initialized Ollama LLM at {settings.ollama_host}")
+            except Exception as e:
+                print(f"⚠️  Failed to initialize Ollama LLM: {e}. Using stub LLM.")
                 self.llm = StubLLM()
                 self.llm_name = "stub"
         else:
             self.llm = StubLLM()
             self.llm_name = "stub"
+            print(f"✅ Using stub LLM (provider: {settings.llm_provider})")
+            
+        # Add LLM health check
+        self._llm_healthy = self._check_llm_health()
 
         self.metrics = Metrics()
         self._doc_titles = set()
@@ -206,6 +241,18 @@ class RAGEngine:
         
         # Sync with existing data on startup
         self._sync_with_existing_data()
+
+    def _check_llm_health(self) -> bool:
+        """Quick health check for the LLM"""
+        try:
+            if isinstance(self.llm, StubLLM):
+                return True  # Stub is always healthy
+            
+            # Quick test generation
+            test_response = self.llm.generate("Test", [{"title": "Test", "section": "Test", "text": "Test"}])
+            return not test_response.startswith("❌")
+        except Exception:
+            return False
 
     def _sync_with_existing_data(self):
         """Sync internal counters with existing data in the vector store"""
@@ -283,6 +330,8 @@ class RAGEngine:
             "total_chunks": self._chunk_count,
             "embedding_model": settings.embedding_model,
             "llm_model": self.llm_name,
+            "llm_healthy": self._llm_healthy,
+            "vector_store": settings.vector_store,
             **m
         }
 

@@ -12,4 +12,45 @@ class Settings(BaseModel):
     chunk_overlap: int = int(os.getenv("CHUNK_OVERLAP", "80"))
     data_dir: str = os.getenv("DATA_DIR", "/app/data")
 
+    def validate_config(self) -> dict:
+        """Validate configuration and return status"""
+        issues = []
+        warnings = []
+        
+        # Validate LLM provider configuration
+        if self.llm_provider == "openai":
+            if not self.openai_api_key:
+                issues.append("OPENAI_API_KEY is required when LLM_PROVIDER=openai")
+            elif not self.openai_api_key.startswith(('sk-', 'sk-proj-')):
+                issues.append("OPENAI_API_KEY appears to have invalid format")
+        
+        if self.llm_provider == "ollama":
+            if not self.ollama_host:
+                issues.append("OLLAMA_HOST is required when LLM_PROVIDER=ollama")
+        
+        # Validate chunk settings
+        if self.chunk_size < 100:
+            warnings.append("CHUNK_SIZE is very small, may affect retrieval quality")
+        if self.chunk_overlap >= self.chunk_size:
+            issues.append("CHUNK_OVERLAP must be smaller than CHUNK_SIZE")
+            
+        return {
+            "valid": len(issues) == 0,
+            "issues": issues,
+            "warnings": warnings
+        }
+
 settings = Settings()
+
+# Print configuration validation on startup
+config_status = settings.validate_config()
+if config_status["issues"]:
+    print("❌ Configuration Issues:")
+    for issue in config_status["issues"]:
+        print(f"   • {issue}")
+if config_status["warnings"]:
+    print("⚠️  Configuration Warnings:")
+    for warning in config_status["warnings"]:
+        print(f"   • {warning}")
+if config_status["valid"] and not config_status["warnings"]:
+    print("✅ Configuration validated successfully")

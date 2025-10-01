@@ -21,7 +21,15 @@ engine = RAGEngine()
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok"}
+    config_status = settings.validate_config()
+    return {
+        "status": "ok",
+        "config_valid": config_status["valid"],
+        "config_issues": config_status["issues"],
+        "config_warnings": config_status["warnings"],
+        "llm_provider": settings.llm_provider,
+        "vector_store": settings.vector_store
+    }
 
 @app.get("/api/metrics", response_model=MetricsResponse)
 def metrics():

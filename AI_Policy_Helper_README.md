@@ -258,13 +258,21 @@ winget install GnuWin32.Make
 Our project uses **Make** to simplify common tasks. Instead of typing long Docker commands, you can use these shortcuts:
 
 ```bash
-# Start development environment (with hot reload)
+# Development Environment (with hot reload)
 make dev
 # → Runs: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
-# Start production environment (for testing/deployment)
+# Development Environment with Ollama (local LLM)
+make dev-ollama  
+# → Runs: docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile ollama up -d
+
+# Production Environment
 make prod
 # → Runs: docker compose up --build -d
+
+# Production Environment with Ollama (local LLM)
+make prod-ollama
+# → Runs: docker compose --profile ollama up --build -d
 
 # Run all tests (detailed output)
 make test  
@@ -300,7 +308,28 @@ docker compose exec backend black app
 
 ### Recommended Development Workflow
 
-1. **Start development environment**: `make dev` (includes hot reload)
+#### Choose Your LLM Provider
+
+**Option 1: Fast Development (Stub LLM)**
+```bash
+# Set LLM_PROVIDER=stub in .env
+make dev  # Fast startup, deterministic responses
+```
+
+**Option 2: Local LLM (Ollama)**
+```bash
+# Set LLM_PROVIDER=ollama in .env  
+make dev-ollama  # Includes ~2GB model download on first run
+```
+
+**Option 3: OpenAI (Best Quality)**
+```bash
+# Set LLM_PROVIDER=openai and OPENAI_API_KEY in .env
+make dev  # Fast startup, requires API key
+```
+
+#### Development Steps
+1. **Start development environment** with your chosen LLM option
 2. **Make your changes** to the code (changes auto-reload)
 3. **Before committing**: `make pre-commit`
    - This will automatically format your code
@@ -310,7 +339,7 @@ docker compose exec backend black app
 
 ### For Testing/Production
 
-- **Production build**: `make prod` (builds and starts production containers)
+- **Production build**: `make prod` or `make prod-ollama`
 - **Testing**: Always use the development environment for faster iteration
 
 ### Test Coverage
@@ -423,9 +452,49 @@ npm run dev
 - Provide small architecture diagram if you can (ASCII is fine).
 
 ### Troubleshooting
-- **Qdrant healthcheck failing**: ensure port `6333` is free; re-run compose.
-- **CORS**: CORS is configured to `*` in `main.py` for local dev.
-- **Embeddings/LLM**: With no keys, stub models run by default so the app always works.
+
+#### Quick Diagnostics
+```bash
+# Check system health and configuration
+curl -s http://localhost:8000/api/health
+
+# Check environment setup
+make env-check
+
+# View service status
+docker compose ps
+
+# Alternative: Use browser for formatted JSON
+# Visit: http://localhost:8000/api/health
+```
+
+#### Common Issues
+
+**🔧 Environment Setup**
+- **Missing .env file**: Run `make setup` to create from template
+- **Invalid API keys**: Check `make env-check` for validation warnings
+- **Configuration errors**: Visit `/api/health` for detailed config status
+
+**🚀 Service Health**
+- **Qdrant healthcheck failing**: Ensure port `6333` is free; run `make down && make dev`
+- **Ollama unhealthy**: New containers may take 30s for health check, this is normal
+- **Backend errors**: Check `docker compose logs backend` for detailed error messages
+
+**🤖 LLM Provider Issues**
+- **OpenAI authentication errors**: Gracefully handled with clear error messages
+- **Ollama connection issues**: Ensure `make dev-ollama` was used, not just `make dev`
+- **Stub mode**: Always works as fallback - no external dependencies
+
+**🔄 Environment Changes**
+```bash
+# After changing .env file, always restart with rebuild:
+make down-all  # Stops everything including Ollama
+make dev       # or make dev-ollama
+```
+
+**📱 Frontend/CORS**
+- **CORS issues**: Configured to `*` in `main.py` for local development
+- **API connection**: Check `NEXT_PUBLIC_API_BASE` in `.env` matches backend URL
 
 ### Submission
 - Share GitHub repo link + your short demo video.
