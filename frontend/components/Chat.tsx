@@ -13,6 +13,15 @@ export default function Chat() {
   const [messages, setMessages] = React.useState<Message[]>([]);
   const [q, setQ] = React.useState('');
   const [loading, setLoading] = React.useState(false);
+  const messagesEndRef = React.useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  React.useEffect(() => {
+    scrollToBottom();
+  }, [messages, loading]);
 
   const send = async () => {
     if (!q.trim()) return;
@@ -41,76 +50,110 @@ export default function Chat() {
 
   return (
     <div className='card'>
-      <h2>Chat</h2>
-      <div
-        style={{
-          maxHeight: 320,
-          overflowY: 'auto',
-          padding: 8,
-          border: '1px solid #eee',
-          borderRadius: 8,
-          marginBottom: 12,
-        }}
-      >
-        {messages.map((m, i) => (
-          <div key={i} style={{ margin: '8px 0' }}>
-            <div style={{ fontSize: 12, color: '#666' }}>
-              {m.role === 'user' ? 'You' : 'Assistant'}
+      <h2 style={{ margin: '0 0 1rem 0', color: '#2d3748', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        💬 Chat
+      </h2>
+      
+      <div className="chat-messages">
+        {messages.length === 0 && (
+          <div className="empty-state">
+            <p>👋 Hi! I'm your AI assistant. Ask me about policies, products, shipping, or returns.</p>
+            <div className="suggested-questions">
+              <p><strong>Try asking:</strong></p>
+              <button 
+                className="suggestion-btn"
+                onClick={() => setQ("Can a customer return a damaged blender after 20 days?")}
+              >
+                "Can a customer return a damaged blender after 20 days?"
+              </button>
+              <button 
+                className="suggestion-btn"
+                onClick={() => setQ("What's the shipping SLA to East Malaysia for bulky items?")}
+              >
+                "What's the shipping SLA to East Malaysia for bulky items?"
+              </button>
             </div>
-            <div>{m.content}</div>
+          </div>
+        )}
+        
+        {messages.map((m, i) => (
+          <div key={i} className={`message ${m.role}`}>
+            <div className="message-header">
+              <span className="message-role">
+                {m.role === 'user' ? '👤 You' : '🤖 AI Assistant'}
+              </span>
+            </div>
+            <div 
+              className="message-content" 
+              dangerouslySetInnerHTML={{ 
+                __html: m.content
+                  .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                  .replace(/\n/g, '<br>')
+              }} 
+            />
+            
             {m.citations && m.citations.length > 0 && (
-              <div style={{ marginTop: 6 }}>
+              <div className="citations">
+                <div className="citations-label">📚 Sources:</div>
                 {m.citations.map((c, idx) => (
-                  <span key={idx} className='badge' title={c.section || ''}>
+                  <span key={idx} className='badge' title={c.section || 'Document source'}>
                     {c.title}
                   </span>
                 ))}
               </div>
             )}
+            
             {m.chunks && m.chunks.length > 0 && (
-              <details style={{ marginTop: 6 }}>
-                <summary>View supporting chunks</summary>
-                {m.chunks.map((c, idx) => (
-                  <div key={idx} className='card'>
-                    <div style={{ fontWeight: 600 }}>
-                      {c.title}
-                      {c.section ? ' — ' + c.section : ''}
+              <details className="chunks-details">
+                <summary className="chunks-summary">🔍 View supporting text ({m.chunks.length} sources)</summary>
+                <div className="chunks-container">
+                  {m.chunks.map((c, idx) => (
+                    <div key={idx} className='chunk-card'>
+                      <div className="chunk-header">
+                        📄 <strong>{c.title}</strong>
+                        {c.section && <span className="chunk-section"> → {c.section}</span>}
+                      </div>
+                      <div className="chunk-text">{c.text}</div>
                     </div>
-                    <div style={{ whiteSpace: 'pre-wrap' }}>{c.text}</div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </details>
             )}
           </div>
         ))}
+        
+        {loading && (
+          <div className="message assistant">
+            <div className="message-header">
+              <span className="message-role">🤖 AI Assistant</span>
+            </div>
+            <div className="typing-indicator">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
       </div>
-      <div style={{ display: 'flex', gap: 8 }}>
+      
+      <div className="chat-input">
         <input
-          placeholder='Ask about policy or products...'
+          type="text"
+          placeholder='Ask about policies, products, shipping, returns...'
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          style={{
-            flex: 1,
-            padding: 10,
-            borderRadius: 8,
-            border: '1px solid #ddd',
-          }}
+          className="chat-input-field"
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !loading) send();
+            if (e.key === 'Enter' && !loading && q.trim()) send();
           }}
         />
         <button
           onClick={send}
-          disabled={loading}
-          style={{
-            padding: '10px 14px',
-            borderRadius: 8,
-            border: '1px solid #111',
-            background: '#111',
-            color: '#fff',
-          }}
+          disabled={loading || !q.trim()}
+          className="btn-primary chat-send-btn"
         >
-          {loading ? 'Thinking...' : 'Send'}
+          {loading ? '⏳' : '📤'}
         </button>
       </div>
     </div>
