@@ -104,16 +104,83 @@ ai-policy-helper/
 └─ .env.example
 ```
 
-## Testing
+## Development Workflow
 
-### Running Tests
+### Setup Make (Build Tool)
+
+**macOS/Linux**: Make is already installed ✅
+
+**Windows**: Install Make using one of these options:
 ```bash
-# 1. Build and start all services (--build ensures latest test files)
+# Option 1: Using Chocolatey
+choco install make
+
+# Option 2: Using Scoop
+scoop install make
+
+# Option 3: Using winget
+winget install GnuWin32.Make
+```
+
+### Available Commands
+
+Our project uses **Make** to simplify common tasks. Instead of typing long Docker commands, you can use these shortcuts:
+
+```bash
+# Start development environment (with hot reload)
+make dev
+# → Runs: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+# Start production environment (for testing/deployment)
+make prod
+# → Runs: docker compose up --build -d
+
+# Run all tests (detailed output)
+make test  
+# → Runs: docker compose exec backend bash -c "cd /app && PYTHONPATH=/app pytest -v"
+
+# Format code automatically (fixes formatting issues)
+make fmt
+# → Runs: docker compose exec backend black app
+
+# Run complete check (format + test)
+make check
+# → Runs: make fmt && make test
+
+# Pre-commit workflow (run before committing code)
+make pre-commit
+# → Same as make check, ensures code is ready to commit
+```
+
+### Manual Commands (If you don't want to use Make)
+
+If you prefer to run commands directly:
+
+```bash
+# Start development
 docker compose up --build -d
 
-# 2. Run comprehensive test suite
+# Run tests
 docker compose exec backend bash -c "cd /app && PYTHONPATH=/app pytest -v"
+
+# Format code
+docker compose exec backend black app
 ```
+
+### Recommended Development Workflow
+
+1. **Start development environment**: `make dev` (includes hot reload)
+2. **Make your changes** to the code (changes auto-reload)
+3. **Before committing**: `make pre-commit`
+   - This will automatically format your code
+   - Run all tests
+   - If anything fails, fix the issues and run again
+4. **Commit your changes**: `git add . && git commit -m "your message"`
+
+### For Testing/Production
+
+- **Production build**: `make prod` (builds and starts production containers)
+- **Testing**: Always use the development environment for faster iteration
 
 ### Test Coverage
 - **Health & Metrics**: API endpoint validation
