@@ -1,107 +1,219 @@
-# AI Policy & Product Helper
+# 🤖 AI Policy & Product Helper
 
-A local-fir## LLM Provider Options
+A local-first RAG (Retrieval-Augmented Generation) system for customer sup## 📊 API Reference
 
-**OpenAI (Recommended for testing)**:
+### Core Endpoints
+
 ```bash
-# Set LLM_PROVIDER=openai in .env
-docker compose up --build  # Fast startup, no model downloads
+# Ingest documents
+POST /api/ingest
+# Returns: { indexed_docs, indexed_chunks }
+
+# Ask questions  
+POST /api/ask
+# Body: { "query": "Your question here", "k": 4 }
+# Returns: { answer, citations[], chunks[], metrics }
+
+# System status
+GET /api/health  # { "status": "ok" }
+GET /api/metrics # Counters + performance data
 ```
 
-**Ollama (Local LLM)**:
-```bash  
-# Set LLM_PROVIDER=ollama in .env
-docker compose --profile ollama up --build  # Includes ~2GB model download
-```
+### Example Usage
 
-**Offline/Stub mode**:
 ```bash
-# Set LLM_PROVIDER=stub in .env - fully local, deterministic responses
-docker compose up --build
-```RAG starter with **FastAPI** (backend), **Next.js** (frontend), and **Qdrant** (vector DB). Runs with one command using Docker Compose.
-
-
-## Quick start
-
-1) **Copy `.env.example` → `.env`** and edit as needed.
-
-2) **Run everything**:
-
-**Production mode** (for deployment/testing):
-```bash
-docker compose up -d
-```
-
-**Development mode** (with hot reload for coding):
-```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
-```
-
-**Stop everything**:
-```bash
-docker compose down
-```
-
-**Important: Changing environment variables**:
-When modifying `.env` file (e.g., switching LLM providers), Docker Compose caches the old values. Always use:
-```bash
-docker compose down
-docker compose --profile ollama up --build -d  # (or without --profile for other providers)
-```
-**Never use** `docker compose restart` as it doesn't reload environment variables.
-
-- Frontend: http://localhost:3000  
-- Backend:  http://localhost:8000/docs  
-- Qdrant:   http://localhost:6333 (UI)
-
-3) **Ingest sample docs** (from the UI Admin tab) or:
-```bash
+# Test ingestion
 curl -X POST http://localhost:8000/api/ingest
+
+# Ask a question
+curl -X POST http://localhost:8000/api/ask \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"What is the return policy for damaged products?"}'
+```t queries. Built with **FastAPI** (backend), **Next.js** (frontend), and **Qdrant** (vector database). 
+
+**⚡ Get started in 60 seconds:**
+
+```bash
+# 1. Clone and setup
+git clone <your-repo-url>
+cd ai-policy-helper-starter-pack
+
+# 2. Configure (optional - works without API keys)
+cp .env.example .env
+# Edit .env to add OPENAI_API_KEY if desired
+
+# 3. Run everything
+docker compose up --build
+
+# 4. Open http://localhost:3000 and click "Ingest sample docs"
 ```
 
-4) **Ask a question**:
+## ✨ Features
+
+- 🔍 **Smart Document Search**: Vector-based retrieval with citations
+- 💬 **Interactive Chat**: Clean UI with source document references  
+- 🏠 **Fully Local**: Works offline with built-in embeddings and stub LLM
+- ☁️ **Cloud Ready**: Optional OpenAI integration for better responses
+- 🐳 **One-Command Setup**: Docker Compose handles everything
+- 📱 **Responsive Design**: Works on desktop and mobile
+
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Docker and Docker Compose
+- Git
+
+### 1. Setup (30 seconds)
 ```bash
-curl -X POST http://localhost:8000/api/ask -H 'Content-Type: application/json' \
-  -d '{"query":"What’s the shipping SLA to East Malaysia for bulky items?"}'
+git clone <your-repo-url>
+cd ai-policy-helper-starter-pack
+cp .env.example .env
 ```
+
+### 2. Launch (2-3 minutes)
+```bash
+docker compose up --build
+```
+
+### 3. Use the Application
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:8000/docs  
+- **Vector DB UI**: http://localhost:6333
+
+### 4. Test the System
+1. Click **"Ingest sample docs"** in the Admin panel
+2. Try these test questions:
+   - *"Can a customer return a damaged blender after 20 days?"*
+   - *"What's the shipping SLA to East Malaysia for bulky items?"*
+
+**That's it!** 🎉 The system works entirely offline with no API keys required.
+
+## 🔧 Configuration Options
+
+### LLM Providers
+
+**Option 1: Offline/Stub (Default - No setup needed)**
+```bash
+# Already configured in .env.example
+LLM_PROVIDER=stub
+```
+
+**Option 2: OpenAI (Recommended for better responses)**
+```bash
+# Edit .env file:
+LLM_PROVIDER=openai
+OPENAI_API_KEY=your-api-key-here
+
+# Restart:
+docker compose down && docker compose up --build
+```
+
+**Option 3: Local Ollama**
+```bash
+# Edit .env file:
+LLM_PROVIDER=ollama
+
+# Launch with Ollama (includes ~2GB model download):
+docker compose --profile ollama up --build
+```
+
+## 🛠️ Development Commands
+
+```bash
+# Development mode (hot reload)
+make dev
+
+# Stop all services  
+make down-all
+
+# Run tests
+make test
+
+# View all available commands
+make
+```
+
+## 🔧 Troubleshooting
+
+### Quick Health Check
+```bash
+# Check if everything is working
+curl http://localhost:8000/api/health
+
+# View service status
+docker compose ps
+
+# Check configuration
+make env-check
+```
+
+### Common Issues
+
+**Services won't start:**
+```bash
+# Clean restart
+make down-all
+make dev
+```
+
+**Environment changes not applying:**
+```bash
+# Docker caches .env - always restart after changes
+docker compose down
+docker compose up --build
+```
+
+**Port conflicts:**
+- Frontend (3000), Backend (8000), Qdrant (6333) must be free
+- Stop conflicting services or change ports in docker-compose.yml
+
+**API connection issues:**
+- Check `NEXT_PUBLIC_API_BASE=http://localhost:8000` in .env
+- Ensure backend is healthy: `curl http://localhost:8000/api/health`
 
 ## Offline-friendly
 - If you **don’t** set an API key, the backend uses a **deterministic stub LLM** and a **built-in embedding** to keep everything fully local.
 - If you set `OPENAI_API_KEY` (or configure Ollama), the backend will use real models automatically.
 
-## Project layout
+## 📁 Project Structure
+
 ```
-ai-policy-helper/
-├─ backend/
-│  ├─ app/
-│  │  ├─ main.py          # FastAPI app + endpoints
-│  │  ├─ settings.py      # config/env
-│  │  ├─ rag.py           # embeddings, vector store, retrieval, generation
-│  │  ├─ models.py        # pydantic models
-│  │  ├─ ingest.py        # doc loader & chunker
-│  │  ├─ __init__.py
-│  │  └─ tests/
-│  │     ├─ conftest.py
-│  │     └─ test_api.py
-│  ├─ requirements.txt
-│  └─ Dockerfile
-├─ frontend/
-│  ├─ app/
-│  │  ├─ page.tsx         # chat UI
-│  │  ├─ layout.tsx
-│  │  └─ globals.css
-│  ├─ components/
-│  │  ├─ Chat.tsx
-│  │  └─ AdminPanel.tsx
-│  ├─ lib/api.ts
-│  ├─ package.json
-│  ├─ tsconfig.json
-│  ├─ next.config.js
-│  └─ Dockerfile
-├─ data/                  # sample policy docs
-├─ docker-compose.yml
-├─ Makefile
-└─ .env.example
+ai-policy-helper-starter-pack/
+├── 🚀 Quick Start Files
+│   ├── docker-compose.yml     # One-command setup
+│   ├── Makefile              # Development shortcuts
+│   └── .env.example          # Configuration template
+│
+├── 🔧 Backend (FastAPI)
+│   └── backend/
+│       ├── app/
+│       │   ├── main.py       # API endpoints
+│       │   ├── rag.py        # RAG engine & LLM providers
+│       │   ├── ingest.py     # Document processing
+│       │   ├── models.py     # Data models
+│       │   ├── settings.py   # Configuration
+│       │   └── tests/        # Test suite (12 tests)
+│       ├── requirements.txt
+│       └── Dockerfile
+│
+├── 🎨 Frontend (Next.js)
+│   └── frontend/
+│       ├── app/
+│       │   ├── page.tsx      # Main application
+│       │   ├── layout.tsx    # App layout
+│       │   └── globals.css   # Styling
+│       ├── components/
+│       │   ├── Chat.tsx      # Chat interface
+│       │   └── AdminPanel.tsx # Admin controls
+│       └── lib/api.ts        # API client
+│
+└── 📄 Sample Data
+    └── data/                 # 6 policy documents
+        ├── Returns_and_Refunds.md
+        ├── Warranty_Policy.md
+        ├── Delivery_and_Shipping.md
+        └── ...
 ```
 
 ## Architecture & Design
@@ -351,12 +463,14 @@ make dev  # Fast startup, requires API key
 
 **Note**: Tests take ~4 minutes due to Ollama LLM being slow (~20s/query). With OpenAI, they run much faster.
 
-## Notes
-- Keep it simple. For take-home, focus on correctness, citations, and clean code.
-
 ---
 
-## Candidate Instructions (Read Me First)
+# 📋 Original Assignment Instructions
+
+> **Note:** The sections below contain the original take-home assignment instructions. 
+> The application is fully completed and ready to use with the Quick Start guide above.
+
+## Assignment Overview
 
 ### Goal
 Build a local-first **Policy & Product Helper** using RAG that:
