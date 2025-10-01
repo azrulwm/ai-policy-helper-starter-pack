@@ -9,19 +9,46 @@ from qdrant_client import QdrantClient, models as qm
 def _tokenize(s: str) -> List[str]:
     return [t.lower() for t in s.split()]
 
-class LocalEmbedder:
+class SemanticEmbedder:
     def __init__(self, dim: int = 384):
         self.dim = dim
+        try:
+            from sentence_transformers import SentenceTransformer
+            # Use a lightweight but effective model
+            self.model = SentenceTransformer('all-MiniLM-L6-v2')
+            print("✅ Loaded Sentence-Transformers semantic embedder")
+            self.use_semantic = True
+        except ImportError:
+            print("⚠️  Sentence-Transformers not available, falling back to hash-based embedder")
+            self.use_semantic = False
 
     def embed(self, text: str) -> np.ndarray:
-        # Hash-based repeatable pseudo-embedding
-        h = hashlib.sha1(text.encode("utf-8")).digest()
-        rng_seed = int.from_bytes(h[:8], "big") % (2**32-1)
-        rng = np.random.default_rng(rng_seed)
-        v = rng.standard_normal(self.dim).astype("float32")
-        # L2 normalize
-        v = v / (np.linalg.norm(v) + 1e-9)
-        return v
+        if self.use_semantic:
+            # Use real semantic embeddings
+            embedding = self.model.encode(text, convert_to_numpy=True)
+            # Ensure consistent dimensionality
+            if len(embedding) != self.dim:
+                if len(embedding) > self.dim:
+                    # Truncate
+                    embedding = embedding[:self.dim]
+                else:
+                    # Pad with zeros
+                    padded = np.zeros(self.dim, dtype=np.float32)
+                    padded[:len(embedding)] = embedding
+                    embedding = padded
+            return embedding.astype(np.float32)
+        else:
+            # Fallback to simple hash-based (for compatibility)
+            h = hashlib.sha1(text.encode("utf-8")).digest()
+            rng_seed = int.from_bytes(h[:8], "big") % (2**32-1)
+            rng = np.random.default_rng(rng_seed)
+            v = rng.standard_normal(self.dim).astype("float32")
+            v = v / (np.linalg.norm(v) + 1e-9)
+            return v
+
+class LocalEmbedder(SemanticEmbedder):
+    """Backward compatibility alias"""
+    pass
 
 # ---- Vector store abstraction ----
 class InMemoryStore:
