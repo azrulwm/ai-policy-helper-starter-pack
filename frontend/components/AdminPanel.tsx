@@ -52,10 +52,10 @@ export default function AdminPanel() {
         <div className="metrics-section">
           <div className="status-bar">
             <span className="status-item">
-              📄 {metrics.document_count || 0} docs
+              📄 {metrics.total_docs || 0} docs
             </span>
             <span className="status-item">
-              🔍 {metrics.vector_count || 0} chunks
+              🔍 {metrics.total_chunks || 0} chunks
             </span>
             <span className="status-item">
               🤖 {metrics.llm_model || 'stub'}
