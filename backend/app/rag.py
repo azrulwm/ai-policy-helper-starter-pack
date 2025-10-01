@@ -60,13 +60,12 @@ class InMemoryStore:
 
     def upsert(self, vectors: List[np.ndarray], metadatas: List[Dict]):
         for v, m in zip(vectors, metadatas):
-            h = m.get("hash")
-            if h and h in self._hashes:
-                continue
-            self.vecs.append(v.astype("float32"))
-            self.meta.append(m)
-            if h:
-                self._hashes.add(h)
+            self.vectors.append(v)
+            self.metadatas.append(m)
+
+    def count(self) -> int:
+        """Get actual count of vectors in memory"""
+        return len(self.vectors)
 
     def search(self, query: np.ndarray, k: int = 4) -> List[Tuple[float, Dict]]:
         if not self.vecs:
@@ -107,6 +106,14 @@ class QdrantStore:
             
             points.append(qm.PointStruct(id=point_id, vector=v.tolist(), payload=m))
         self.client.upsert(collection_name=self.collection, points=points)
+
+    def count(self) -> int:
+        """Get actual count of vectors in the collection"""
+        try:
+            info = self.client.get_collection(self.collection)
+            return info.points_count
+        except Exception:
+            return 0
 
     def search(self, query: np.ndarray, k: int = 4) -> List[Tuple[float, Dict]]:
         res = self.client.search(
@@ -317,10 +324,17 @@ class RAGEngine:
         vectors = []
         metas = []
         doc_titles_before = set(self._doc_titles)
+        processed_hashes = set()
+        chunks_before = self.store.count()
 
         for ch in chunks:
             text = ch["text"]
             h = doc_hash(text)
+            
+            # Skip if we already processed this exact chunk in this batch
+            if h in processed_hashes:
+                continue
+                
             meta = {
                 "id": h,
                 "hash": h,
@@ -331,11 +345,18 @@ class RAGEngine:
             v = self.embedder.embed(text)
             vectors.append(v)
             metas.append(meta)
+            processed_hashes.add(h)
             self._doc_titles.add(ch["title"])
-            self._chunk_count += 1
 
-        self.store.upsert(vectors, metas)
-        return (len(self._doc_titles) - len(doc_titles_before), len(metas))
+        if vectors:
+            self.store.upsert(vectors, metas)
+            
+        # Return actual counts: new docs and chunks added
+        new_docs = len(self._doc_titles) - len(doc_titles_before)
+        chunks_after = self.store.count()
+        new_chunks = chunks_after - chunks_before
+            
+        return (new_docs, max(0, new_chunks))  # Ensure non-negative
 
     def retrieve(self, query: str, k: int = 4) -> List[Dict]:
         t0 = time.time()
@@ -354,7 +375,7 @@ class RAGEngine:
         m = self.metrics.summary()
         return {
             "total_docs": len(self._doc_titles),
-            "total_chunks": self._chunk_count,
+            "total_chunks": self.store.count(),  # Get actual count from store
             "embedding_model": settings.embedding_model,
             "llm_model": self.llm_name,
             "llm_healthy": self._llm_healthy,
