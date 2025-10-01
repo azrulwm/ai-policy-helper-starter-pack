@@ -104,6 +104,137 @@ ai-policy-helper/
 └─ .env.example
 ```
 
+## Architecture & Design
+
+### System Overview
+
+```mermaid
+graph TB
+    subgraph "Frontend (Next.js)"
+        A[Chat Interface]
+        B[Admin Panel]
+    end
+    
+    subgraph "Backend (FastAPI)"
+        C[RAG Engine]
+        D[Document Ingestion]
+        E[API Endpoints]
+    end
+    
+    subgraph "Storage"
+        F[Qdrant Vector DB]
+        G[Data Directory<br/>(/data/*.md)]
+    end
+    
+    subgraph "External Services"
+        H[OpenAI API<br/>(Optional)]
+        I[Ollama<br/>(Optional)]
+    end
+    
+    A --> E
+    B --> E
+    E --> C
+    E --> D
+    D --> F
+    C --> F
+    C --> H
+    C --> I
+    G --> D
+    
+    style A fill:#e1f5fe
+    style B fill:#e1f5fe
+    style C fill:#f3e5f5
+    style D fill:#f3e5f5
+    style F fill:#e8f5e8
+    style G fill:#fff3e0
+```
+
+### Data Flow
+
+#### Document Ingestion Flow
+```mermaid
+flowchart LR
+    A[📁 /data/*.md files] --> B[📝 Document Loader]
+    B --> C[✂️ Text Chunking]
+    C --> D[🔢 Generate Embeddings]
+    D --> E[💾 Store in Qdrant]
+    
+    style A fill:#fff3e0
+    style E fill:#e8f5e8
+```
+
+#### Query Processing Flow
+```mermaid
+flowchart LR
+    A[💬 User Question] --> B[🔍 Vector Search]
+    B --> C[📊 Retrieve Chunks]
+    C --> D[🤖 LLM Generation]
+    D --> E[📋 Answer + Citations]
+    
+    style A fill:#e1f5fe
+    style E fill:#e1f5fe
+```
+
+### Key Components
+
+#### RAG Engine (`backend/app/rag.py`)
+- **LocalEmbedder**: Deterministic hash-based embeddings (384d) for reproducible results
+- **QdrantStore/InMemoryStore**: Vector storage with fallback capability
+- **StubLLM/OpenAILLM/OllamaLLM**: Configurable LLM providers
+
+#### Frontend (`frontend/components/`)
+- **Chat.tsx**: Question input + conversation history + expandable citations
+- **AdminPanel.tsx**: Document ingestion + metrics display + system controls
+
+### Design Trade-offs
+
+#### Local-First vs Cloud-First
+**✅ Chosen: Local-First**
+- **Pros**: No API costs, works offline, deterministic testing, data privacy
+- **Cons**: Limited model capabilities, slower performance than cloud LLMs
+- **Decision**: Perfect for development/demos, easily switchable to OpenAI for production
+
+#### Vector Store: Qdrant vs In-Memory
+**✅ Chosen: Qdrant with In-Memory fallback**
+- **Pros**: Production-ready, persistent, scales well, great UI for debugging
+- **Cons**: Additional dependency, Docker complexity
+- **Decision**: Best of both worlds - robust for production, graceful fallback for development
+
+#### Frontend: Server-Side vs Client-Side
+**✅ Chosen: Next.js with Client Components**
+- **Pros**: Fast development, good DX, handles state well for chat interface
+- **Cons**: Could be simpler with pure server-side rendering
+- **Decision**: Chat interfaces need client state; Next.js provides good balance
+
+#### Citation Strategy: Metadata vs Full-Text
+**✅ Chosen: Metadata-based with chunk expansion**
+- **Pros**: Clean UI, expandable details, preserves source context
+- **Cons**: More complex than simple highlighting
+- **Decision**: Better UX for policy documents where context matters
+
+### Production Considerations
+
+#### Next Steps for Production Deployment
+1. **Switch to OpenAI API** for better answer quality
+2. **Add authentication** and user management
+3. **Implement rate limiting** and request throttling
+4. **Add monitoring** (Prometheus/Grafana) for RAG metrics
+5. **Scale vector storage** with Qdrant clustering
+6. **Add caching** for frequently asked questions
+7. **Implement CI/CD** with automated testing and deployment
+
+#### Performance Optimizations
+- **Batch embedding generation** for large document sets
+- **Semantic caching** to avoid repeated LLM calls
+- **Async processing** for document ingestion
+- **Connection pooling** for database operations
+
+#### Security & Compliance
+- **Input sanitization** for user queries
+- **Output filtering** to prevent prompt injection
+- **Audit logging** for all RAG operations
+- **Document access controls** based on user roles
+
 ## Development Workflow
 
 ### Setup Make (Build Tool)
