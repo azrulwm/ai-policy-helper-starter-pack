@@ -45,12 +45,14 @@ services:
       - '11434:11434'
     volumes:
       - ollama_data:/root/.ollama
+      - ./ollama-init.sh:/usr/local/bin/ollama-init.sh:ro
+    entrypoint: ["/bin/bash", "/usr/local/bin/ollama-init.sh"]
     healthcheck:
-      test: ["CMD-SHELL", "ollama list || exit 1"]
+      test: ["CMD-SHELL", "ollama list | grep -q llama3.2:1b || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 30s
+      retries: 10
+      start_period: 180s  # Give more time for model download
     profiles:
       - ollama
 
